@@ -15,6 +15,10 @@
 */
 package net.objecthunter.exp4j.operator;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Class representing operators that can be used in an expression
  */
@@ -55,7 +59,8 @@ public abstract class Operator {
     /**
      * The set of allowed operator chars
      */
-    public static final char[] ALLOWED_OPERATOR_CHARS = { '+', '-', '*', '/', '%', '^', '!', '#','§', '$', '&', ';', ':', '~', '<', '>', '|', '='};
+    public static final Character[] ALLOWED_OPERATOR_CHARS = { '+', '-', '*', '/', '%', '^', '!', '#','§', '$', '&', ';', ':', '~', '<', '>', '|', '=', '?'};
+    public static final Set<Character> ALLOWED_OPERATOR_CHARS_SET = new HashSet<>(Arrays.asList(ALLOWED_OPERATOR_CHARS));
 
     protected final int numOperands;
     protected final boolean leftAssociative;
@@ -84,12 +89,7 @@ public abstract class Operator {
      * @return true if the char is allowed an an operator symbol, false otherwise
      */
     public static boolean isAllowedOperatorChar(char ch) {
-        for (char allowed: ALLOWED_OPERATOR_CHARS) {
-            if (ch == allowed) {
-                return true;
-            }
-        }
-        return false;
+        return ALLOWED_OPERATOR_CHARS_SET.contains(ch);
     }
 
     /**

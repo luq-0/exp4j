@@ -32,7 +32,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -42,15 +41,17 @@ public class Expression {
     private final Token[] tokens;
 
     private final Map<String, Double> variables;
+    private VariableProvider variableProvider = new VariableProvider.Empty();
 
     private final Set<String> userFunctionNames;
 
     private static Map<String, Double> createDefaultVariables() {
-        final Map<String, Double> vars = new HashMap<String, Double>(4);
+        final Map<String, Double> vars = new HashMap<>(4);
         vars.put("pi", Math.PI);
         vars.put("π", Math.PI);
         vars.put("φ", 1.61803398874d);
         vars.put("e", Math.E);
+        vars.put("Infinity", Double.POSITIVE_INFINITY);
         return vars;
     }
     
@@ -61,15 +62,13 @@ public class Expression {
      */
     public Expression(final Expression existing) {
     	this.tokens = Arrays.copyOf(existing.tokens, existing.tokens.length);
-    	this.variables = new HashMap<String,Double>();
+    	this.variables = new HashMap<>();
     	this.variables.putAll(existing.variables);
-    	this.userFunctionNames = new HashSet<String>(existing.userFunctionNames);
+    	this.userFunctionNames = new HashSet<>(existing.userFunctionNames);
     }
 
     Expression(final Token[] tokens) {
-        this.tokens = tokens;
-        this.variables = createDefaultVariables();
-        this.userFunctionNames = Collections.<String>emptySet();
+        this(tokens, Collections.emptySet());
     }
 
     Expression(final Token[] tokens, Set<String> userFunctionNames) {
@@ -80,7 +79,12 @@ public class Expression {
 
     public Expression setVariable(final String name, final double value) {
         this.checkVariableName(name);
-        this.variables.put(name, Double.valueOf(value));
+        this.variables.put(name, value);
+        return this;
+    }
+
+    public Expression setVariableProvider(final VariableProvider provider) {
+        variableProvider = provider;
         return this;
     }
 
@@ -98,7 +102,7 @@ public class Expression {
     }
 
     public Set<String> getVariableNames() {
-        final Set<String> variables = new HashSet<String>();
+        final Set<String> variables = new HashSet<>();
         for (final Token t: tokens) {
             if (t.getType() == Token.TOKEN_VARIABLE)
                 variables.add(((VariableToken)t).getName());
@@ -113,7 +117,7 @@ public class Expression {
             for (final Token t : this.tokens) {
                 if (t.getType() == Token.TOKEN_VARIABLE) {
                     final String var = ((VariableToken) t).getName();
-                    if (!variables.containsKey(var)) {
+                    if (!variables.containsKey(var) && !variableProvider.hasVariable(var)) {
                         errors.add("The setVariable '" + var + "' has not been set");
                     }
                 }
@@ -170,23 +174,17 @@ public class Expression {
     }
 
     public Future<Double> evaluateAsync(ExecutorService executor) {
-        return executor.submit(new Callable<Double>() {
-            @Override
-            public Double call() throws Exception {
-                return evaluate();
-            }
-        });
+        return executor.submit(this::evaluate);
     }
 
     public double evaluate() {
         final ArrayStack output = new ArrayStack();
-        for (int i = 0; i < tokens.length; i++) {
-            Token t = tokens[i];
+        for (Token t : tokens) {
             if (t.getType() == Token.TOKEN_NUMBER) {
                 output.push(((NumberToken) t).getValue());
             } else if (t.getType() == Token.TOKEN_VARIABLE) {
-                final String name = ((VariableToken) t).getName();
-                final Double value = this.variables.get(name);
+                String name = ((VariableToken) t).getName();
+                Double value = variableProvider.hasVariable(name) ? variableProvider.getDouble(name) : variables.get(name);
                 if (value == null) {
                     throw new IllegalArgumentException("No value has been set for the setVariable '" + name + "'.");
                 }

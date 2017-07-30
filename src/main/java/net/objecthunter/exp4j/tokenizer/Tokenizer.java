@@ -278,10 +278,8 @@ public class Tokenizer {
     }
 
     public static boolean isVariableOrFunctionCharacter(int codePoint) {
-        return isAlphabetic(codePoint) ||
-                Character.isDigit(codePoint) ||
-                codePoint == '_' ||
-                codePoint == '.';
+        return !Operator.isAllowedOperatorChar((char)codePoint)
+                && !Character.isWhitespace(codePoint);
     }
 
     private boolean isEndOfExpression(int offset) {
